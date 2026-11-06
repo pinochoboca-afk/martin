@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prueba de GitHub</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 15%,#253b70,transparent 38%),linear-gradient(135deg,#101827,#090d17);font-family:system-ui,sans-serif;color:#f4f7ff}.card{width:min(620px,100%);padding:42px;border:1px solid #ffffff22;border-radius:24px;background:#ffffff0c;box-shadow:0 24px 80px #0008;backdrop-filter:blur(12px)}.tag{display:inline-block;padding:7px 12px;border-radius:99px;background:#35d39a20;color:#68edbd;font-size:13px;font-weight:700;letter-spacing:.04em}h1{font-size:clamp(34px,7vw,54px);line-height:1.05;margin:20px 0 12px}p{color:#b9c4d8;line-height:1.7}.buttons{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}button{border:0;border-radius:12px;padding:13px 18px;font-weight:700;font-size:15px;cursor:pointer;background:#6d8cff;color:white;transition:transform .18s,filter .18s}button:hover{transform:translateY(-2px);filter:brightness(1.12)}button.secondary{background:#ffffff18;color:#eef2ff;border:1px solid #ffffff25}.result{margin-top:22px;min-height:28px;color:#70edbd;font-weight:600}.foot{margin-top:32px;padding-top:18px;border-top:1px solid #ffffff18;color:#8290a8;font-size:13px}</style>
+</head>
+<body>
+<main class="card">
+<span class="tag">✓ PÁGINA PUBLICADA</span>
+<h1>¡Hola, GitHub!</h1>
+<p>Esta página fue creada desde ChatGPT directamente en tu repositorio. Si estás viendo esto, la conexión funciona y podemos guardar archivos en GitHub.</p>
+<div class="buttons">
+<button id="test">Probar botón</button>
+<button class="secondary" id="color">Cambiar fondo</button>
+</div>
+<div class="result" id="result" aria-live="polite"></div>
+<div class="foot">Prueba de conexión · HTML, CSS y JavaScript</div>
+</main>
+<script>
+const result=document.querySelector('#result');
+document.querySelector('#test').addEventListener('click',()=>{result.textContent='¡Funciona! JavaScript está ejecutándose correctamente.'});
+const colors=['#101827','#202044','#183b38','#3b2638','#252f45'];let i=0;
+document.querySelector('#color').addEventListener('click',()=>{i=(i+1)%colors.length;document.body.style.background='radial-gradient(circle at 20% 15%,#253b70,transparent 38%),linear-gradient(135deg,'+colors[i]+',#090d17)';result.textContent='Fondo cambiado.'});
+</script>
+</body>
+</html>
