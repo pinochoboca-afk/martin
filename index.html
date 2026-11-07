@@ -43,41 +43,54 @@ let enemies=[
 ];
 const boss={x:5240,y:370,w:78,h:78,hp:5,dir:-1,alive:true,hit:0,attack:0};
 const particles=[];const floaters=[];
+let audioCtx=null,musicTimer=null,musicStep=0;
+function tone(freq,duration=.12,type='square',vol=.035){if(!audioCtx)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+duration)}
+function sfx(freq=440,duration=.08){tone(freq,duration,'square',.045)}
+function startMusic(){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;if(!audioCtx)audioCtx=new AC();if(audioCtx.state==='suspended')audioCtx.resume();if(musicTimer)return;const notes=[392,494,587,494,440,523,659,523,392,494,587,784,659,587,494,440,330,392,494,587,523,494,440,392];musicTimer=setInterval(()=>{if(!running)return;const n=notes[musicStep++%notes.length];tone(n,.19,'triangle',.018);if(musicStep%4===0)tone(n/2,.28,'sine',.025)},210)}
+
 function rect(a,b,w,h,col){x.fillStyle=col;x.fillRect(Math.round(a),Math.round(b),w,h)}
 function text(t,a,b,size=16,col='#fff'){x.font='bold '+size+'px system-ui';x.fillStyle='#182b35';x.fillText(t,a+2,b+2);x.fillStyle=col;x.fillText(t,a,b)}
-function onGround(px,py,pw,ph){let best=null;for(const s of platforms){if(px+pw>s[0]&&px<s[0]+s[2]&&py+ph<=s[1]+12&&py+ph>=s[1]-8)best=s[1]}for(let i=0;i<pits.length;i++){const p=pits[i];if(px+pw>p[0]&&px<p[1])return best}if(px+pw>0&&px<levelEnd&&!pits.some(p=>px+pw>p[0]&&px<p[1]))best=groundY;return best}
+function overPit(px,pw){return pits.some(p=>px+pw>p[0]+4&&px<p[1]-4)}
+function rectHit(a,b,w,h,o){return a<o.x+o.w&&a+w>o.x&&b<o.y+o.h&&b+h>o.y}
 function solidAt(px,py,pw,ph){for(const s of platforms)if(px+pw>s[0]&&px<s[0]+s[2]&&py+ph>s[1]&&py<s[1]+s[3])return s;return null}
 function resetPlayer(){player.x=checkpoint;player.y=groundY-player.h;player.vx=player.vy=0;player.inv=100}
 function hurt(){if(player.inv>0)return;lives--;ui.lives.textContent=lives;if(lives<=0){running=false;ui.overlay.style.display='grid';document.getElementById('panel').innerHTML='<h1>FIN DE LA PARTIDA</h1><p>La fortaleza sigue en pie. ¡Probá otra vez!</p><button id="again">VOLVER A INTENTAR</button>';document.getElementById('again').onclick=restart;return}resetPlayer()}
-function restart(){lives=3;coins=0;ui.lives.textContent=3;ui.coins.textContent=0;enemies.forEach(e=>e.alive=true);boss.hp=5;boss.alive=true;blocks.forEach(b=>b.used=false);checkpoint=150;resetPlayer();running=true;ui.overlay.style.display='none';loop()}
+function restart(){lives=3;coins=0;ui.lives.textContent=3;ui.coins.textContent=0;enemies.forEach(e=>e.alive=true);boss.hp=5;boss.alive=true;boss.x=5240;boss.hit=0;blocks.forEach(b=>b.used=false);checkpoint=150;resetPlayer();running=true;ui.overlay.style.display='none';startMusic();loop()}
 function burst(px,py,color,n=8){for(let i=0;i<n;i++)particles.push({x:px,y:py,vx:(Math.random()-.5)*5,vy:-Math.random()*5-1,life:30,color})}
 function coin(px,py){coins++;ui.coins.textContent=coins;floaters.push({x:px,y:py,life:35});burst(px,py,'#ffe477',5)}
 function hitBlock(b){if(b.used)return;b.used=true;burst(b.x+19,b.y,'#e9a84b',7);if(b.prize==='coin')coin(b.x+19,b.y-10);else{player.fire=true;floaters.push({x:b.x+19,y:b.y-18,life:60,flower:true})}}
 function update(){
  frame++;if(shake>0)shake--;if(player.inv>0)player.inv--;
- const accel=.62, max=4.2;
+ const prevY=player.y,prevBottom=prevY+player.h,accel=.62,max=4.2;
  if(keys.left){player.vx-=accel;player.face=-1}if(keys.right){player.vx+=accel;player.face=1}
  if(!keys.left&&!keys.right)player.vx*=.78;player.vx=Math.max(-max,Math.min(max,player.vx));
- if(keys.jump&&player.ground){player.vy=-12.8;player.ground=false;keys.jump=false}
+ if(keys.jump&&player.ground){player.vy=-12.8;player.ground=false;keys.jump=false;sfx(520,.07)}
  player.vy=Math.min(13,player.vy+.58);
- let nx=player.x+player.vx;
- if(nx<0)nx=0;if(nx>levelEnd-player.w)nx=levelEnd-player.w;
- // horizontal collisions with pipes and solid platforms
- for(const p of pipes)if(nx+player.w>p.x&&nx<p.x+48&&player.y+player.h>groundY-p.h){if(player.x+player.w<=p.x)nx=p.x-player.w;else if(player.x>=p.x+48)nx=p.x+48}
+ let nx=Math.max(0,Math.min(levelEnd-player.w,player.x+player.vx));
+ const overlapY=(y,h,oy,oh)=>y+h>oy+2&&y<oy+oh-2;
+ // Bloques y tuberías: colisión lateral real.
+ for(const b of blocks)if(rectHit(nx,player.y,player.w,player.h,{x:b.x,y:b.y,w:b.w,h:b.h})&&overlapY(player.y,player.h,b.y,b.h)){nx=player.vx>0?b.x-player.w:b.x+b.w;player.vx=0}
+ for(const p of pipes){const py=groundY-p.h;if(nx+player.w>p.x&&nx<p.x+48&&overlapY(player.y,player.h,py,p.h)){nx=player.vx>0?p.x-player.w:p.x+48;player.vx=0}}
  player.x=nx;
  let ny=player.y+player.vy;player.ground=false;
- const floor=onGround(player.x,ny,player.w,player.h);
- if(player.vy>=0&&floor!==null&&ny+player.h>=floor&&player.y+player.h<=floor+18){ny=floor-player.h;player.vy=0;player.ground=true}
- // platform undersides and question blocks
- if(player.vy<0)for(const b of blocks)if(player.x+player.w>b.x&&player.x<b.x+b.w&&player.y>=b.y+b.h-4&&ny<=b.y+b.h){ny=b.y+b.h;player.vy=0;hitBlock(b)}
+ if(player.vy>=0){
+   let landing=null;
+   for(const p of platforms)if(player.x+player.w>p[0]+2&&player.x<p[0]+p[2]-2&&prevBottom<=p[1]+3&&ny+player.h>=p[1])if(landing===null||p[1]<landing)landing=p[1];
+   if(!overPit(player.x,player.w)&&prevBottom<=groundY+3&&ny+player.h>=groundY)if(landing===null||groundY<landing)landing=groundY;
+   if(landing!==null){ny=landing-player.h;player.vy=0;player.ground=true}
+ }else{
+   for(const b of blocks)if(player.x+player.w>b.x+2&&player.x<b.x+b.w-2&&prevY>=b.y+b.h-2&&ny<=b.y+b.h){ny=b.y+b.h;player.vy=0;hitBlock(b);sfx(180,.09)}
+ }
+ // Los bloques también son sólidos al aterrizar y por debajo.
+ for(const b of blocks)if(player.x+player.w>b.x+1&&player.x<b.x+b.w-1&&ny+player.h>b.y+1&&ny<b.y+b.h-1){
+   if(player.vy>=0&&prevBottom<=b.y+5){ny=b.y-player.h;player.vy=0;player.ground=true}
+   else if(player.vy<0&&prevY>=b.y+b.h-5){ny=b.y+b.h;player.vy=0}
+ }
  player.y=ny;
- const pipe=pipes.find(p=>player.x+player.w>p.x&&player.x<p.x+48&&player.y+player.h>groundY-p.h&&player.y<groundY);
- if(pipe&&player.ground){if(player.x+player.w/2<pipe.x+24)player.x=pipe.x-player.w;else player.x=pipe.x+48}
  if(player.y>570){hurt();return}
- if(player.x>900&&checkpoint<950)checkpoint=950;
- if(player.x>2850&&checkpoint<2900)checkpoint=2900;
- enemies.forEach(e=>{if(!e.alive)return;e.x+=e.vx;if(e.x<e.min||e.x+e.w>e.max)e.vx*=-1;if(player.x+player.w>e.x&&player.x<e.x+e.w&&player.y+player.h>e.y&&player.y<e.y+e.h){if(player.vy>1&&player.y+player.h<e.y+18){e.alive=false;player.vy=-8;burst(e.x+16,e.y,'#b9d66a',10)}else hurt()}});
- if(boss.alive){boss.attack++;boss.x+=boss.dir*.8;if(boss.x<5120||boss.x>5370)boss.dir*=-1;if(boss.hit>0)boss.hit--;if(player.x+player.w>boss.x&&player.x<boss.x+boss.w&&player.y+player.h>boss.y&&player.y<boss.y+boss.h){if(player.vy>1&&player.y+player.h<boss.y+25&&boss.hit===0){boss.hp--;boss.hit=70;player.vy=-10;shake=10;burst(boss.x+38,boss.y,'#ffd36b',14);if(boss.hp<=0){boss.alive=false;won=true;running=false;ui.overlay.style.display='grid';document.getElementById('panel').innerHTML='<h1>¡CORONA RECUPERADA!</h1><p>El Guardián cayó. El bosque vuelve a florecer gracias a tu valentía.</p><button id="again">JUGAR DE NUEVO</button>';document.getElementById('again').onclick=restart}}else if(boss.hit===0)hurt()}}
+ if(player.x>900&&checkpoint<950)checkpoint=950;if(player.x>2850&&checkpoint<2900)checkpoint=2900;
+ enemies.forEach(e=>{if(!e.alive)return;e.x+=e.vx;if(e.x<e.min||e.x+e.w>e.max)e.vx*=-1;if(player.x+player.w>e.x&&player.x<e.x+e.w&&player.y+player.h>e.y&&player.y<e.y+e.h){if(player.vy>1&&prevBottom<e.y+17){e.alive=false;player.vy=-8;player.ground=false;burst(e.x+16,e.y,'#b9d66a',10);sfx(260,.12)}else hurt()}});
+ if(boss.alive){boss.attack++;boss.x+=boss.dir*.8;if(boss.x<5120||boss.x>5370)boss.dir*=-1;if(boss.hit>0)boss.hit--;if(player.x+player.w>boss.x&&player.x<boss.x+boss.w&&player.y+player.h>boss.y&&player.y<boss.y+boss.h){if(player.vy>1&&prevBottom<boss.y+25&&boss.hit===0){boss.hp--;boss.hit=70;player.vy=-10;player.ground=false;shake=10;burst(boss.x+38,boss.y,'#ffd36b',14);sfx(100,.22);if(boss.hp<=0){boss.alive=false;won=true;running=false;ui.overlay.style.display='grid';document.getElementById('panel').innerHTML='<h1>¡CORONA RECUPERADA!</h1><p>El Guardián cayó. El bosque vuelve a florecer gracias a tu valentía.</p><button id="again">JUGAR DE NUEVO</button>';document.getElementById('again').onclick=restart}}else if(boss.hit===0)hurt()}}
  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.18;p.life--});for(let i=particles.length-1;i>=0;i--)if(particles[i].life<=0)particles.splice(i,1);
  floaters.forEach(f=>{f.y-=1;f.life--});for(let i=floaters.length-1;i>=0;i--)if(floaters[i].life<=0)floaters.splice(i,1);
  cam=Math.max(0,Math.min(levelEnd-W,player.x-W*.38));
@@ -128,7 +141,7 @@ function draw(){x.save();if(shake)x.translate((Math.random()-.5)*shake,(Math.ran
  if(boss.alive&&player.x>4950){rect(350,14,260,34,'#172c3cbb');text('GUARDIÁN DE PIEDRA',365,37,16,'#ffe4a0');for(let i=0;i<boss.hp;i++)rect(550+i*12,23,9,13,'#e45a50')}
  x.restore()}
 function loop(){if(!running)return;update();draw();requestAnimationFrame(loop)}
-function begin(){if(won)restart();else{running=true;ui.overlay.style.display='none';loop()}}
+function begin(){if(won)restart();else{running=true;ui.overlay.style.display='none';startMusic();loop()}}
 ui.start.onclick=begin;
 window.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowDown',' ','ArrowUp'].includes(e.key))e.preventDefault();if(e.key==='ArrowLeft'||e.key==='a')keys.left=true;if(e.key==='ArrowRight'||e.key==='d')keys.right=true;if(e.key==='ArrowDown'||e.key==='s')keys.down=true;if((e.key===' '||e.key==='ArrowUp'||e.key==='w')&&!keys.jump){keys.jump=true}});
 window.addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=false;if(e.key==='ArrowRight'||e.key==='d')keys.right=false;if(e.key==='ArrowDown'||e.key==='s')keys.down=false;if(e.key===' '||e.key==='ArrowUp'||e.key==='w')keys.jump=false});
